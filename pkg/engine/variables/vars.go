@@ -8,11 +8,12 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	jsoniter "github.com/json-iterator/go"
 	gojmespath "github.com/kyverno/go-jmespath"
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
 	"github.com/kyverno/kyverno/pkg/engine/anchor"
 	"github.com/kyverno/kyverno/pkg/engine/context"
-	jsonUtils "github.com/kyverno/kyverno/pkg/engine/jsonutils"
+	"github.com/kyverno/kyverno/pkg/engine/jsonutils"
 	"github.com/kyverno/kyverno/pkg/engine/operator"
 	"github.com/kyverno/kyverno/pkg/engine/variables/regex"
 	"github.com/kyverno/kyverno/pkg/logging"
@@ -58,7 +59,7 @@ func SubstituteAll(log logr.Logger, ctx context.EvalInterface, document interfac
 }
 
 func SubstituteAllInPreconditions(log logr.Logger, ctx context.EvalInterface, document interface{}) (interface{}, error) {
-	untypedDoc, err := DocumentToUntyped(document)
+	untypedDoc, err := jsonutils.DocumentToUntyped(document)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func SubstituteAllInPreconditions(log logr.Logger, ctx context.EvalInterface, do
 }
 
 func SubstituteAllInType[T any](log logr.Logger, ctx context.EvalInterface, t *T) (*T, error) {
-	untyped, err := DocumentToUntyped(t)
+	untyped, err := jsonutils.DocumentToUntyped(t)
 	if err != nil {
 		return nil, err
 	}
@@ -99,24 +100,8 @@ func SubstituteAllInRule(log logr.Logger, ctx context.EvalInterface, rule kyvern
 	return *result, nil
 }
 
-// DocumentToUntyped converts a typed object to JSON data i.e.
-// string, []interface{}, map[string]interface{}
-func DocumentToUntyped(doc interface{}) (interface{}, error) {
-	jsonDoc, err := json.Marshal(doc)
-	if err != nil {
-		return nil, err
-	}
-
-	var untyped interface{}
-	err = json.Unmarshal(jsonDoc, &untyped)
-	if err != nil {
-		return nil, err
-	}
-
-	return untyped, nil
-}
-
 func untypedToTyped[T any](untyped interface{}) (*T, error) {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	jsonRule, err := json.Marshal(untyped)
 	if err != nil {
 		return nil, err
@@ -146,6 +131,7 @@ func SubstituteAllInConditions(log logr.Logger, ctx context.EvalInterface, condi
 }
 
 func ConditionsToJSONObject(conditions []kyvernov1.AnyAllConditions) ([]map[string]interface{}, error) {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	bytes, err := json.Marshal(conditions)
 	if err != nil {
 		return nil, err
@@ -160,6 +146,7 @@ func ConditionsToJSONObject(conditions []kyvernov1.AnyAllConditions) ([]map[stri
 }
 
 func JSONObjectToConditions(data interface{}) ([]kyvernov1.AnyAllConditions, error) {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -184,7 +171,7 @@ func substituteAll(log logr.Logger, ctx context.EvalInterface, document interfac
 func SubstituteAllForceMutate(log logr.Logger, ctx context.Interface, typedRule kyvernov1.Rule) (_ kyvernov1.Rule, err error) {
 	var rule interface{}
 
-	rule, err = DocumentToUntyped(typedRule)
+	rule, err = jsonutils.DocumentToUntyped(typedRule)
 	if err != nil {
 		return kyvernov1.Rule{}, err
 	}
@@ -212,19 +199,19 @@ func SubstituteAllForceMutate(log logr.Logger, ctx context.Interface, typedRule 
 }
 
 func substituteVars(log logr.Logger, ctx context.EvalInterface, rule interface{}, vr VariableResolver) (interface{}, error) {
-	return jsonUtils.NewTraversal(rule, substituteVariablesIfAny(log, ctx, vr)).TraverseJSON()
+	return jsonutils.NewTraversal(rule, substituteVariablesIfAny(log, ctx, vr)).TraverseJSON()
 }
 
 func substituteReferences(log logr.Logger, rule interface{}) (interface{}, error) {
-	return jsonUtils.NewTraversal(rule, substituteReferencesIfAny(log)).TraverseJSON()
+	return jsonutils.NewTraversal(rule, substituteReferencesIfAny(log)).TraverseJSON()
 }
 
 func ValidateElementInForEach(log logr.Logger, rule interface{}) (interface{}, error) {
-	return jsonUtils.NewTraversal(rule, validateElementInForEach(log)).TraverseJSON()
+	return jsonutils.NewTraversal(rule, validateElementInForEach(log)).TraverseJSON()
 }
 
-func validateElementInForEach(log logr.Logger) jsonUtils.Action {
-	return jsonUtils.OnlyForLeafsAndKeys(func(data *jsonUtils.ActionData) (interface{}, error) {
+func validateElementInForEach(log logr.Logger) jsonutils.Action {
+	return jsonutils.OnlyForLeafsAndKeys(func(data *jsonutils.ActionData) (interface{}, error) {
 		value, ok := data.Element.(string)
 		if !ok {
 			return data.Element, nil
@@ -257,8 +244,8 @@ func (n NotResolvedReferenceError) Error() string {
 	return fmt.Sprintf("NotResolvedReferenceErr,reference %s not resolved at path %s", n.reference, n.path)
 }
 
-func substituteReferencesIfAny(log logr.Logger) jsonUtils.Action {
-	return jsonUtils.OnlyForLeafsAndKeys(func(data *jsonUtils.ActionData) (interface{}, error) {
+func substituteReferencesIfAny(log logr.Logger) jsonutils.Action {
+	return jsonutils.OnlyForLeafsAndKeys(func(data *jsonutils.ActionData) (interface{}, error) {
 		value, ok := data.Element.(string)
 		if !ok {
 			return data.Element, nil
@@ -323,9 +310,9 @@ func DefaultVariableResolver(ctx context.EvalInterface, variable string) (interf
 	return ctx.Query(variable)
 }
 
-func substituteVariablesIfAny(log logr.Logger, ctx context.EvalInterface, vr VariableResolver) jsonUtils.Action {
-	isDeleteRequest := isDeleteRequest(ctx)
-	return jsonUtils.OnlyForLeafsAndKeys(func(data *jsonUtils.ActionData) (interface{}, error) {
+func substituteVariablesIfAny(log logr.Logger, ctx context.EvalInterface, vr VariableResolver) jsonutils.Action {
+	isDeleteRequest := (ctx.QueryOperation() == "DELETE")
+	return jsonutils.OnlyForLeafsAndKeys(func(data *jsonutils.ActionData) (interface{}, error) {
 		value, ok := data.Element.(string)
 		if !ok {
 			return data.Element, nil
@@ -403,23 +390,13 @@ func substituteVariablesIfAny(log logr.Logger, ctx context.EvalInterface, vr Var
 	})
 }
 
-func isDeleteRequest(ctx context.EvalInterface) bool {
-	if ctx == nil {
-		return false
-	}
-	operation, err := ctx.Query("request.operation")
-	if err == nil && operation == "DELETE" {
-		return true
-	}
-	return false
-}
-
 func substituteVarInPattern(prefix, pattern, variable string, value interface{}) (string, error) {
 	var stringToSubstitute string
 
 	if s, ok := value.(string); ok {
 		stringToSubstitute = s
 	} else {
+		var json = jsoniter.ConfigCompatibleWithStandardLibrary
 		buffer, err := json.Marshal(value)
 		if err != nil {
 			return "", fmt.Errorf("failed to marshal %T: %v", value, value)
@@ -531,8 +508,8 @@ func formAbsolutePath(referencePath, absolutePath string) string {
 func getValueFromReference(fullDocument interface{}, path string) (interface{}, error) {
 	var element interface{}
 
-	if _, err := jsonUtils.NewTraversal(fullDocument, jsonUtils.OnlyForLeafsAndKeys(
-		func(data *jsonUtils.ActionData) (interface{}, error) {
+	if _, err := jsonutils.NewTraversal(fullDocument, jsonutils.OnlyForLeafsAndKeys(
+		func(data *jsonutils.ActionData) (interface{}, error) {
 			if anchor.RemoveAnchorsFromPath(data.Path) == path {
 				element = data.Element
 			}
@@ -546,6 +523,7 @@ func getValueFromReference(fullDocument interface{}, path string) (interface{}, 
 }
 
 func replaceSubstituteVariables(document interface{}) interface{} {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	rawDocument, err := json.Marshal(document)
 	if err != nil {
 		return document

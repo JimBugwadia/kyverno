@@ -1,8 +1,7 @@
 package data
 
 import (
-	"encoding/json"
-
+	jsoniter "github.com/json-iterator/go"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -28,6 +27,7 @@ func CopySliceOfMaps(s []map[string]interface{}) []interface{} {
 }
 
 func ToMap(data interface{}) (map[string]interface{}, error) {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	if m, ok := data.(map[string]interface{}); ok {
 		return m, nil
 	}

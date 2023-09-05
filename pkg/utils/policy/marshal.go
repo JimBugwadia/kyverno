@@ -1,14 +1,14 @@
 package policy
 
 import (
-	"encoding/json"
-
+	jsoniter "github.com/json-iterator/go"
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
 	"sigs.k8s.io/yaml"
 )
 
 // ToJson marshals a policy into corresponding json bytes.
 func ToJson(policy kyvernov1.PolicyInterface) ([]byte, error) {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	return json.Marshal(policy)
 }
 

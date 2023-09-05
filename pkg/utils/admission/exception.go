@@ -1,14 +1,14 @@
 package admission
 
 import (
-	"encoding/json"
-
+	jsoniter "github.com/json-iterator/go"
 	kyvernov2alpha1 "github.com/kyverno/kyverno/api/kyverno/v2alpha1"
 	admissionv1 "k8s.io/api/admission/v1"
 )
 
 func UnmarshalPolicyException(raw []byte) (*kyvernov2alpha1.PolicyException, error) {
 	var exception *kyvernov2alpha1.PolicyException
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	if err := json.Unmarshal(raw, &exception); err != nil {
 		return nil, err
 	}

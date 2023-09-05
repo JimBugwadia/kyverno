@@ -1,9 +1,9 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 
+	jsoniter "github.com/json-iterator/go"
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
@@ -13,6 +13,8 @@ func DeserializeJSONArray[T any](in apiextensions.JSON) ([]T, error) {
 	if in == nil {
 		return nil, nil
 	}
+
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	data, err := json.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -29,6 +31,7 @@ func DeserializeJSONArray[T any](in apiextensions.JSON) ([]T, error) {
 // it also helps in validating the condtions as it returns an error when the conditions are provided wrongfully by the user.
 func ApiextensionsJsonToKyvernoConditions(in apiextensions.JSON) (interface{}, error) {
 	path := "preconditions/validate.deny.conditions"
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 	// checks for the existence any other field apart from 'any'/'all' under preconditions/validate.deny.conditions
 	unknownFieldChecker := func(jsonByteArr []byte, path string) error {

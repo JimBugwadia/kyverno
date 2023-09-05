@@ -193,7 +193,9 @@ func NewPolicyContext(
 	configuration config.Configuration,
 ) (*PolicyContext, error) {
 	enginectx := enginectx.NewContext(jp)
-	if err := enginectx.AddResource(resource.Object); err != nil {
+
+	resourceClone := resource.DeepCopy()
+	if err := enginectx.AddResource(resourceClone.Object); err != nil {
 		return nil, err
 	}
 	if err := enginectx.AddNamespace(resource.GetNamespace()); err != nil {

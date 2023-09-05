@@ -1,9 +1,9 @@
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/kyverno/kyverno/pkg/engine/variables/regex"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -472,6 +472,7 @@ func (in *Validation) DeserializeAnyPattern() ([]interface{}, error) {
 }
 
 func deserializePattern(pattern apiextensions.JSON) ([]interface{}, error) {
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	anyPattern, err := json.Marshal(pattern)
 	if err != nil {
 		return nil, err

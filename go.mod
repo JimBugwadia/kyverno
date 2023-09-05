@@ -2,6 +2,8 @@ module github.com/kyverno/kyverno
 
 go 1.20
 
+replace github.com/kyverno/go-jmespath => ../go-jmespath
+
 require (
 	github.com/IGLOU-EU/go-wildcard v1.0.3
 	github.com/aquilax/truncate v1.0.0
@@ -24,6 +26,7 @@ require (
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20230403180904-b8d1c0a1df12
 	github.com/in-toto/in-toto-golang v0.6.0
 	github.com/jmoiron/jsonq v0.0.0-20150511023944-e874b168d07e
+	github.com/json-iterator/go v1.1.12
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/kataras/tablewriter v0.0.0-20180708051242-e063d29b7c23
 	github.com/kyverno/go-jmespath v0.4.1-0.20230705123211-d067dc3d6613
@@ -229,7 +232,6 @@ require (
 	github.com/jinzhu/copier v0.3.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/leodido/go-urn v1.2.2 // indirect

@@ -260,7 +260,7 @@ func (iv *ImageVerifier) verifyImage(
 		}
 	}
 	iv.logger.V(2).Info("verifying image signatures", "image", image, "attestors", len(imageVerify.Attestors), "attestations", len(imageVerify.Attestations))
-	if err := iv.policyContext.JSONContext().AddImageInfo(imageInfo, cfg); err != nil {
+	if err := iv.policyContext.JSONContext().AddImageInfo(imageInfo); err != nil {
 		iv.logger.Error(err, "failed to add image to context")
 		return engineapi.RuleError(iv.rule.Name, engineapi.ImageVerify, fmt.Sprintf("failed to add image to context %s", image), err), ""
 	}

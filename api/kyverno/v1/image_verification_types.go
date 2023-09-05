@@ -1,8 +1,9 @@
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
+
+	jsoniter "github.com/json-iterator/go"
 
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -413,6 +414,7 @@ func (a *Attestor) Validate(path *field.Path) (errs field.ErrorList) {
 
 func AttestorSetUnmarshal(o *apiextv1.JSON) (*AttestorSet, error) {
 	var as AttestorSet
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	if err := json.Unmarshal(o.Raw, &as); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal attestor set %s: %w", string(o.Raw), err)
 	}

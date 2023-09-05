@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/go-logr/logr"
+	jsoniter "github.com/json-iterator/go"
 	admissionv1 "k8s.io/api/admission/v1"
 )
 
@@ -34,6 +34,7 @@ func (inner AdmissionHandler) withAdmission(logger logr.Logger) HttpHandler {
 			return
 		}
 		var admissionReview admissionv1.AdmissionReview
+		var json = jsoniter.ConfigCompatibleWithStandardLibrary
 		if err := json.Unmarshal(body, &admissionReview); err != nil {
 			HttpError(request.Context(), writer, request, logger, err, http.StatusExpectationFailed)
 			return

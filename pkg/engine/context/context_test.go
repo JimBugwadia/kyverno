@@ -1,20 +1,21 @@
 package context
 
 import (
-	"reflect"
+	"encoding/json"
 	"testing"
 
 	urkyverno "github.com/kyverno/kyverno/api/kyverno/v1beta1"
 	"github.com/kyverno/kyverno/pkg/config"
 	"github.com/kyverno/kyverno/pkg/engine/jmespath"
+	"gotest.tools/assert"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var jp = jmespath.New(config.NewDefaultConfiguration(false))
 
-func Test_addResourceAndUserContext(t *testing.T) {
-	var err error
-	rawResource := []byte(`
+func newTestResource() []byte {
+	return []byte(`
 	{
 		"apiVersion": "v1",
 		"kind": "Pod",
@@ -28,7 +29,7 @@ func Test_addResourceAndUserContext(t *testing.T) {
 		"spec": {
 		   "containers": [
 			  {
-				 "name": "image-with-hostpath",
+				 "name": "image_with_hostpath",
 				 "image": "docker.io/nautiker/curl",
 				 "volumeMounts": [
 					{
@@ -46,8 +47,12 @@ func Test_addResourceAndUserContext(t *testing.T) {
 		   ]
 		}
 	 }
-			`)
+	`)
+}
 
+func TestAddResourceAndUserContext(t *testing.T) {
+	var err error
+	rawResource := newTestResource()
 	userInfo := authenticationv1.UserInfo{
 		Username: "system:serviceaccount:nirmata:user1",
 		UID:      "014fbff9a07c",
@@ -58,68 +63,67 @@ func Test_addResourceAndUserContext(t *testing.T) {
 		AdmissionUserInfo: userInfo,
 	}
 
-	var expectedResult string
 	ctx := NewContext(jp)
 	err = AddResource(ctx, rawResource)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NilError(t, err)
+
 	result, err := ctx.Query("request.object.apiVersion")
-	if err != nil {
-		t.Error(err)
-	}
-	expectedResult = "v1"
-	t.Log(result)
-	if !reflect.DeepEqual(expectedResult, result) {
-		t.Error("exected result does not match")
-	}
+	assert.NilError(t, err)
+	assert.Equal(t, "v1", result)
 
 	err = ctx.AddUserInfo(userRequestInfo)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NilError(t, err)
+
 	result, err = ctx.Query("request.object.apiVersion")
-	if err != nil {
-		t.Error(err)
-	}
-	expectedResult = "v1"
-	t.Log(result)
-	if !reflect.DeepEqual(expectedResult, result) {
-		t.Error("exected result does not match")
-	}
+	assert.NilError(t, err)
+	assert.Equal(t, "v1", result)
 
 	result, err = ctx.Query("request.userInfo.username")
-	if err != nil {
-		t.Error(err)
-	}
-	expectedResult = "system:serviceaccount:nirmata:user1"
-	t.Log(result)
-	if !reflect.DeepEqual(expectedResult, result) {
-		t.Error("exected result does not match")
-	}
+	assert.NilError(t, err)
+	assert.Equal(t, "system:serviceaccount:nirmata:user1", result)
+
 	// Add service account Name
 	err = ctx.AddServiceAccount(userRequestInfo.AdmissionUserInfo.Username)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NilError(t, err)
+
 	result, err = ctx.Query("serviceAccountName")
-	if err != nil {
-		t.Error(err)
-	}
-	expectedResult = "user1"
-	t.Log(result)
-	if !reflect.DeepEqual(expectedResult, result) {
-		t.Error("exected result does not match")
+	assert.NilError(t, err)
+	assert.Equal(t, "user1", result)
+
+	result, err = ctx.Query("serviceAccountNamespace")
+	assert.NilError(t, err)
+	assert.Equal(t, "nirmata", result)
+
+	err = ctx.ReplaceContextEntry("request", []byte(`{}`))
+	assert.NilError(t, err)
+	_, err = ctx.Query("request.object")
+	assert.ErrorContains(t, err, "Unknown key \"object\" in path")
+}
+
+func TestParseImageInfo(t *testing.T) {
+	rawJson := map[string]interface{}{}
+	err := json.Unmarshal(newTestResource(), &rawJson)
+	assert.NilError(t, err)
+
+	resource := &unstructured.Unstructured{
+		Object: rawJson,
 	}
 
-	// Add service account Namespace
-	result, err = ctx.Query("serviceAccountNamespace")
-	if err != nil {
-		t.Error(err)
-	}
-	expectedResult = "nirmata"
-	t.Log(result)
-	if !reflect.DeepEqual(expectedResult, result) {
-		t.Error("expected result does not match")
-	}
+	ctx := NewContext(jp)
+	err = ctx.AddImageInfos(resource, config.NewDefaultConfiguration(false))
+	assert.NilError(t, err)
+
+	imageInfo := ctx.ImageInfo()
+	assert.Equal(t, "docker.io", imageInfo["containers"]["image_with_hostpath"].Registry)
+	assert.Equal(t, "nautiker/curl", imageInfo["containers"]["image_with_hostpath"].Path)
+	assert.Equal(t, "curl", imageInfo["containers"]["image_with_hostpath"].Name)
+
+	result, err := ctx.Query("images.containers.image_with_hostpath")
+	assert.NilError(t, err)
+
+	rawImageInfo, ok := result.(map[string]interface{})
+	assert.Assert(t, ok)
+	assert.Equal(t, "docker.io", rawImageInfo["registry"])
+	assert.Equal(t, "nautiker/curl", rawImageInfo["path"])
+	assert.Equal(t, "curl", rawImageInfo["name"])
 }

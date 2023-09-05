@@ -1,10 +1,10 @@
 package v2alpha1
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
+	jsoniter "github.com/json-iterator/go"
 	"gotest.tools/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -695,6 +695,7 @@ func Test_doesMatchExcludeConflict(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.description, func(t *testing.T) {
 			var policySpec CleanupPolicySpec
+			var json = jsoniter.ConfigCompatibleWithStandardLibrary
 			err := json.Unmarshal(testcase.policySpec, &policySpec)
 			assert.NilError(t, err)
 			errs := policySpec.ValidateMatchExcludeConflict(path)

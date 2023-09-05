@@ -22,7 +22,7 @@ func NewValidateImageHandler(
 	rule kyvernov1.Rule,
 	configuration config.Configuration,
 ) (handlers.Handler, error) {
-	if engineutils.IsDeleteRequest(policyContext) {
+	if policyContext.Operation() == kyvernov1.Delete {
 		return nil, nil
 	}
 	ruleImages, _, err := engineutils.ExtractMatchingImages(resource, policyContext.JSONContext(), rule, configuration)

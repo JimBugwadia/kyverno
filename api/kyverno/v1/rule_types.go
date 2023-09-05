@@ -1,8 +1,9 @@
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
+
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/kyverno/kyverno/pkg/pss/utils"
 	datautils "github.com/kyverno/kyverno/pkg/utils/data"
@@ -219,6 +220,7 @@ func (r *Rule) ValidateMatchExcludeConflict(path *field.Path) (errs field.ErrorL
 	excludeKinds := sets.New(r.ExcludeResources.Kinds...)
 	excludeNamespaces := sets.New(r.ExcludeResources.Namespaces...)
 	excludeSubjects := sets.New[string]()
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 	for _, subject := range r.ExcludeResources.Subjects {
 		subjectRaw, _ := json.Marshal(subject)
 		excludeSubjects.Insert(string(subjectRaw))

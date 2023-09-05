@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	jsoniter "github.com/json-iterator/go"
 	v1 "github.com/kyverno/kyverno/api/kyverno/v1"
 	"github.com/kyverno/kyverno/pkg/engine/context"
 	ju "github.com/kyverno/kyverno/pkg/engine/jsonutils"
@@ -393,16 +394,28 @@ func Test_ReplacingPathWhenDeleting(t *testing.T) {
 	var pattern interface{}
 	var err error
 	err = json.Unmarshal(patternRaw, &pattern)
-	if err != nil {
-		t.Error(err)
-	}
-	ctx := context.NewContextFromRaw(jp, resourceRaw)
+	assert.NilError(t, err)
+
+	ctxMap, err := unmarshalToMap(resourceRaw)
+	assert.NilError(t, err)
+
+	ctx := context.NewContextFromRaw(jp, ctxMap)
 	assert.NilError(t, err)
 
 	pattern, err = SubstituteAll(logr.Discard(), ctx, pattern)
 	assert.NilError(t, err)
 
 	assert.Equal(t, fmt.Sprintf("%v", pattern), "bar")
+}
+
+func unmarshalToMap(jsonBytes []byte) (map[string]interface{}, error) {
+	var data map[string]interface{}
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func Test_ReplacingNestedVariableWhenDeleting(t *testing.T) {
@@ -431,7 +444,11 @@ func Test_ReplacingNestedVariableWhenDeleting(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ctx := context.NewContextFromRaw(jp, resourceRaw)
+
+	ctxMap, err := unmarshalToMap(resourceRaw)
+	assert.NilError(t, err)
+
+	ctx := context.NewContextFromRaw(jp, ctxMap)
 	assert.NilError(t, err)
 
 	pattern, err = SubstituteAll(logr.Discard(), ctx, pattern)
@@ -633,7 +650,10 @@ func Test_variableSubstitution_array(t *testing.T) {
 	err := json.Unmarshal(ruleRaw, &rule)
 	assert.NilError(t, err)
 
-	ctx := context.NewContextFromRaw(jp, configmapRaw)
+	ctxMap, err := unmarshalToMap(configmapRaw)
+	assert.NilError(t, err)
+
+	ctx := context.NewContextFromRaw(jp, ctxMap)
 	context.AddResource(ctx, resourceRaw)
 
 	vars, err := SubstituteAllInRule(logr.Discard(), ctx, rule)
@@ -1171,7 +1191,11 @@ func Test_ReplacingEscpNestedVariableWhenDeleting(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ctx := context.NewContextFromRaw(jp, resourceRaw)
+
+	ctxMap, err := unmarshalToMap(resourceRaw)
+	assert.NilError(t, err)
+
+	ctx := context.NewContextFromRaw(jp, ctxMap)
 	assert.NilError(t, err)
 
 	pattern, err = SubstituteAll(logr.Discard(), ctx, pattern)

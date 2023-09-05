@@ -257,7 +257,7 @@ func (v *validator) validateResourceWithRule() *engineapi.RuleResponse {
 	if !engineutils.IsEmptyUnstructured(&element) {
 		return v.validatePatterns(element)
 	}
-	if engineutils.IsDeleteRequest(v.policyContext) {
+	if v.policyContext.Operation() == kyvernov1.Delete {
 		v.log.V(3).Info("skipping validation on deleted resource")
 		return nil
 	}

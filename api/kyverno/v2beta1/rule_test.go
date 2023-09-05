@@ -1,12 +1,14 @@
 package v2beta1
 
 import (
-	"encoding/json"
 	"testing"
 
+	jsoniter "github.com/json-iterator/go"
 	"gotest.tools/assert"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func Test_Validate_RuleType_EmptyRule(t *testing.T) {
 	subject := Rule{
