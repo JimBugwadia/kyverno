@@ -5,12 +5,23 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
+	engineapi "github.com/kyverno/kyverno/pkg/engine/api"
 	"github.com/kyverno/kyverno/pkg/logging"
 	apiutils "github.com/kyverno/kyverno/pkg/utils/api"
 	jsonutils "github.com/kyverno/kyverno/pkg/utils/json"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+func IsDeleteRequest(ctx engineapi.PolicyContext) bool {
+	if op := ctx.Operation(); string(op) != "" {
+		return op == kyvernov1.Delete
+	}
+
+	// if the NewResource is empty, the request is a DELETE
+	newResource := ctx.NewResource()
+	return IsEmptyUnstructured(&newResource)
+}
 
 func IsEmptyUnstructured(u *unstructured.Unstructured) bool {
 	if u == nil {

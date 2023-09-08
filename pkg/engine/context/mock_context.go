@@ -66,7 +66,9 @@ func (ctx *MockContext) Query(query string) (interface{}, error) {
 
 func (ctx *MockContext) QueryOperation() string {
 	if op, err := ctx.Query("request.operation"); err != nil {
-		return op.(string)
+		if op != nil {
+			return op.(string)
+		}
 	}
 
 	return ""

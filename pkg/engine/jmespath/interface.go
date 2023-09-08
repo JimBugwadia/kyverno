@@ -19,37 +19,21 @@ type implementation struct {
 }
 
 func New(configuration config.Configuration) Interface {
+	i := gojmespath.NewInterpreter()
 	functions := GetFunctions(configuration)
-	jpFunctions := make([]gojmespath.FunctionEntry, len(functions))
-	for i, f := range functions {
-		jpFunctions[i] = f.FunctionEntry
+	for _, f := range functions {
+		i.Register(f.FunctionEntry)
 	}
 
-	i := gojmespath.NewInterpreter(jpFunctions...)
 	return implementation{
 		interpreter: i,
 	}
 }
 
 func (i implementation) Query(query string) (Query, error) {
-	parser := gojmespath.NewParser()
-	ast, err := parser.Parse(query)
-	if err != nil {
-		return nil, err
-	}
-
-	return &gojmespath.JMESPath{
-		AST:         ast,
-		Interpreter: i.interpreter,
-	}, nil
+	return newJMESPath(i.interpreter, query)
 }
 
 func (i implementation) Search(query string, data interface{}) (interface{}, error) {
-	parser := gojmespath.NewParser()
-	ast, err := parser.Parse(query)
-	if err != nil {
-		return nil, err
-	}
-
-	return i.interpreter.Execute(ast, data)
+	return newExecution(i.interpreter, query, data)
 }

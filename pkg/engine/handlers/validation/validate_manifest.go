@@ -20,6 +20,7 @@ import (
 	"github.com/kyverno/kyverno/pkg/engine/handlers"
 	"github.com/kyverno/kyverno/pkg/engine/internal"
 	engineresources "github.com/kyverno/kyverno/pkg/engine/resources"
+	engineutils "github.com/kyverno/kyverno/pkg/engine/utils"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
 	"go.uber.org/multierr"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -39,7 +40,7 @@ func NewValidateManifestHandler(
 	policyContext engineapi.PolicyContext,
 	client engineapi.Client,
 ) (handlers.Handler, error) {
-	if policyContext.Operation() == kyvernov1.Delete {
+	if engineutils.IsDeleteRequest(policyContext) {
 		return nil, nil
 	}
 	return validateManifestHandler{

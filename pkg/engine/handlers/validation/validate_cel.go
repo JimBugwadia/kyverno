@@ -8,6 +8,7 @@ import (
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
 	engineapi "github.com/kyverno/kyverno/pkg/engine/api"
 	"github.com/kyverno/kyverno/pkg/engine/handlers"
+	engineutils "github.com/kyverno/kyverno/pkg/engine/utils"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,7 +37,7 @@ func (h validateCELHandler) Process(
 	rule kyvernov1.Rule,
 	_ engineapi.EngineContextLoader,
 ) (unstructured.Unstructured, []engineapi.RuleResponse) {
-	if policyContext.Operation() == kyvernov1.Delete {
+	if engineutils.IsDeleteRequest(policyContext) {
 		logger.V(3).Info("skipping CEL validation on deleted resource")
 		return resource, nil
 	}

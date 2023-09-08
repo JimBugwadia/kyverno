@@ -311,7 +311,7 @@ func DefaultVariableResolver(ctx context.EvalInterface, variable string) (interf
 }
 
 func substituteVariablesIfAny(log logr.Logger, ctx context.EvalInterface, vr VariableResolver) jsonutils.Action {
-	isDeleteRequest := (ctx.QueryOperation() == "DELETE")
+	isDeleteRequest := isDeleteRequest(ctx)
 	return jsonutils.OnlyForLeafsAndKeys(func(data *jsonutils.ActionData) (interface{}, error) {
 		value, ok := data.Element.(string)
 		if !ok {
@@ -388,6 +388,19 @@ func substituteVariablesIfAny(log logr.Logger, ctx context.EvalInterface, vr Var
 
 		return value, nil
 	})
+}
+
+func isDeleteRequest(ctx context.EvalInterface) bool {
+	if ctx == nil {
+		return false
+	}
+
+	if op := ctx.QueryOperation(); op != "" {
+		return ctx.QueryOperation() == "DELETE"
+	}
+
+	operation, err := ctx.Query("request.operation")
+	return err == nil && operation == "DELETE"
 }
 
 func substituteVarInPattern(prefix, pattern, variable string, value interface{}) (string, error) {
