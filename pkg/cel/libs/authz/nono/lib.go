@@ -26,9 +26,7 @@ func (c *lib) CompileOptions() []cel.EnvOption {
 		// Register all nono native types so CEL can inspect their fields.
 		ext.NativeTypes(
 			reflect.TypeFor[CheckRequest](),
-			reflect.TypeFor[CapabilityData](),
-			reflect.TypeFor[CommandData](),
-			reflect.TypeFor[EndpointData](),
+			reflect.TypeFor[RequestData](),
 			reflect.TypeFor[CheckResponse](),
 			reflect.TypeFor[CheckResponseGranted](),
 			reflect.TypeFor[CheckResponseDenied](),
@@ -64,8 +62,7 @@ func (c *lib) extendEnv(env *cel.Env) (*cel.Env, error) {
 				cel.UnaryBinding(i.deny),
 			),
 		},
-		// .Response() on CheckResponseGranted → *CheckResponse
-		// .Response() on CheckResponseDenied  → *CheckResponse
+		// .Response() on CheckResponseGranted / CheckResponseDenied → CheckResponse
 		"Response": {
 			cel.MemberOverload(
 				"nono_response_granted",
@@ -80,11 +77,11 @@ func (c *lib) extendEnv(env *cel.Env) (*cel.Env, error) {
 				cel.UnaryBinding(i.responseDenied),
 			),
 		},
-		// object.capability.command.Argv() → list(string) — drops argv[0] (shim path)
-		"Argv": {
+		// object.request.argv() → list(string) — drops argv[0] (the nono shim path)
+		"argv": {
 			cel.MemberOverload(
-				"nono_command_argv",
-				[]*cel.Type{CommandDataType},
+				"nono_request_argv",
+				[]*cel.Type{RequestDataType},
 				types.NewListType(cel.StringType),
 				cel.UnaryBinding(i.argv),
 			),

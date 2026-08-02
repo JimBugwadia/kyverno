@@ -39,14 +39,14 @@ func (c *impl) responseDenied(v ref.Val) ref.Val {
 }
 
 // argv drops args[0] (the nono shim path) and returns args[1:].
-// This mirrors the demo webhook's slicing logic.
+// Called as object.request.argv() in CEL expressions.
 func (c *impl) argv(v ref.Val) ref.Val {
-	cmd, err := authzutils.ConvertToNative[CommandData](v)
+	rd, err := authzutils.ConvertToNative[RequestData](v)
 	if err != nil {
 		return types.WrapErr(err)
 	}
-	if len(cmd.Args) <= 1 {
+	if len(rd.Args) <= 1 {
 		return c.NativeToValue([]string{})
 	}
-	return c.NativeToValue(cmd.Args[1:])
+	return c.NativeToValue(rd.Args[1:])
 }

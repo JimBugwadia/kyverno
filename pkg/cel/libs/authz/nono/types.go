@@ -9,46 +9,37 @@ import (
 )
 
 var (
-	RequestType         = types.NewObjectType("nono.CheckRequest")
+	RequestEnvelopeType = types.NewObjectType("nono.CheckRequest")
+	RequestDataType     = types.NewObjectType("nono.RequestData")
 	ResponseType        = types.NewObjectType("nono.CheckResponse")
 	ResponseGrantedType = types.NewObjectType("nono.CheckResponseGranted")
 	ResponseDeniedType  = types.NewObjectType("nono.CheckResponseDenied")
-	CapabilityType      = types.NewObjectType("nono.CapabilityData")
-	CommandDataType     = types.NewObjectType("nono.CommandData")
-	EndpointDataType    = types.NewObjectType("nono.EndpointData")
 )
 
-// CheckRequest is the nono approval envelope, registered as the CEL `object` variable.
-// Both Command and Endpoint are value types (never nil) so CEL access is always safe.
+// CheckRequest is the outer nono envelope, bound as the CEL `object` variable.
+// Policy expressions access nono-specific data via object.request.*.
 type CheckRequest struct {
-	Backend    string         `json:"backend"    cel:"backend"`
-	Capability CapabilityData `json:"capability" cel:"capability"`
-	// Raw holds the full unstructured request map for forward-compatibility with
-	// future capability types not yet modeled in CapabilityData.
-	Raw map[string]any `json:"raw" cel:"raw"`
+	Backend string      `json:"backend" cel:"backend"`
+	Request RequestData `json:"request" cel:"request"`
 }
 
-// CapabilityData is the union of command and endpoint fields.
-// Fields are zero-valued when not applicable to the capability type.
-type CapabilityData struct {
-	Type     string       `json:"type"     cel:"type"`     // "command" | "endpoint"
-	ID       string       `json:"id"       cel:"id"`       // request_id
-	Session  string       `json:"session"  cel:"session"`  // session_id
-	Pid      int64        `json:"pid"      cel:"pid"`      // child_pid
-	Command  CommandData  `json:"command"  cel:"command"`  // populated when type=="command"
-	Endpoint EndpointData `json:"endpoint" cel:"endpoint"` // populated when type=="endpoint"
-}
+// RequestData mirrors the nono wire format `request` object exactly.
+// All fields are zero-valued when not applicable to the current capability_type,
+// so CEL access is always safe without nil checks.
+type RequestData struct {
+	// Common fields
+	CapabilityType string `json:"capability_type" cel:"capability_type"`
+	RequestID      string `json:"request_id"      cel:"request_id"`
+	SessionID      string `json:"session_id"      cel:"session_id"`
+	ChildPid       int64  `json:"child_pid"       cel:"child_pid"`
 
-// CommandData holds fields present when capability_type == "command".
-type CommandData struct {
-	Name          string   `json:"name"           cel:"name"`
+	// Command fields (populated when capability_type == "command")
+	Command       string   `json:"command"        cel:"command"`
 	Caller        string   `json:"caller"         cel:"caller"`
 	Args          []string `json:"args"           cel:"args"`
 	InterceptRule string   `json:"intercept_rule" cel:"intercept_rule"`
-}
 
-// EndpointData holds fields present when capability_type == "endpoint".
-type EndpointData struct {
+	// Endpoint fields (populated when capability_type == "endpoint")
 	Method    string `json:"method"     cel:"method"`
 	Path      string `json:"path"       cel:"path"`
 	RouteID   string `json:"route_id"   cel:"route_id"`
@@ -56,7 +47,7 @@ type EndpointData struct {
 	RuleLabel string `json:"rule_label" cel:"rule_label"`
 }
 
-// CheckResponse is what a policy validation expression must return (or null).
+// CheckResponse is what a policy validation expression must return.
 type CheckResponse struct {
 	Granted *CheckResponseGranted `json:"granted,omitempty" cel:"granted"`
 	Denied  *CheckResponseDenied  `json:"denied,omitempty"  cel:"denied"`
@@ -68,15 +59,13 @@ type CheckResponseDenied struct {
 	Reason string `json:"reason" cel:"reason"`
 }
 
-// nonoRequestBody is the raw JSON shape nono sends.
+// nonoRequestBody is the raw JSON shape nono sends to POST /approve.
 type nonoRequestBody struct {
 	Backend string         `json:"backend"`
 	Request map[string]any `json:"request"`
 }
 
-// NewRequest parses a nono POST /approve request body into a CheckRequest.
-// Returns an error only for I/O or JSON decode failures; missing fields are
-// silently zero-valued so that fail-closed policy evaluation can still run.
+// NewRequest parses a nono POST /approve HTTP request body into a CheckRequest.
 func NewRequest(r *http.Request) (CheckRequest, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -86,6 +75,7 @@ func NewRequest(r *http.Request) (CheckRequest, error) {
 }
 
 // ParseRequest parses a raw nono approval body.
+// Missing fields are silently zero-valued so fail-closed policy evaluation can still run.
 func ParseRequest(body []byte) (CheckRequest, error) {
 	var raw nonoRequestBody
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -97,43 +87,25 @@ func ParseRequest(body []byte) (CheckRequest, error) {
 		req = map[string]any{}
 	}
 
-	cap := CapabilityData{
-		Type:    stringField(req, "capability_type"),
-		ID:      stringField(req, "request_id"),
-		Session: stringField(req, "session_id"),
-		Pid:     int64Field(req, "child_pid"),
-	}
-
-	switch cap.Type {
-	case "command":
-		cap.Command = CommandData{
-			Name:          stringField(req, "command"),
-			Caller:        stringField(req, "caller"),
-			Args:          stringSliceField(req, "args"),
-			InterceptRule: stringField(req, "intercept_rule"),
-		}
-	case "endpoint":
-		cap.Endpoint = EndpointData{
-			Method:    stringField(req, "method"),
-			Path:      stringField(req, "path"),
-			RouteID:   stringField(req, "route_id"),
-			Upstream:  stringField(req, "upstream"),
-			RuleLabel: stringField(req, "rule_label"),
-		}
-	}
-
-	// Store raw for forward-compat access via object.raw
-	rawMap := map[string]any{
-		"backend": raw.Backend,
-	}
-	for k, v := range req {
-		rawMap[k] = v
+	rd := RequestData{
+		CapabilityType: stringField(req, "capability_type"),
+		RequestID:      stringField(req, "request_id"),
+		SessionID:      stringField(req, "session_id"),
+		ChildPid:       int64Field(req, "child_pid"),
+		Command:        stringField(req, "command"),
+		Caller:         stringField(req, "caller"),
+		Args:           stringSliceField(req, "args"),
+		InterceptRule:  stringField(req, "intercept_rule"),
+		Method:         stringField(req, "method"),
+		Path:           stringField(req, "path"),
+		RouteID:        stringField(req, "route_id"),
+		Upstream:       stringField(req, "upstream"),
+		RuleLabel:      stringField(req, "rule_label"),
 	}
 
 	return CheckRequest{
-		Backend:    raw.Backend,
-		Capability: cap,
-		Raw:        rawMap,
+		Backend: raw.Backend,
+		Request: rd,
 	}, nil
 }
 

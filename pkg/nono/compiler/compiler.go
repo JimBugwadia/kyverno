@@ -70,7 +70,7 @@ func (c *Compiler) compile(policy *v1.ValidatingPolicy, exceptions []*v1.PolicyE
 	// Register lazy variables provider.
 	provider := authzcel.NewVariablesProvider(base.CELTypeProvider())
 	env, err := base.Extend(
-		cel.Variable(objectKey, nonolib.RequestType),
+		cel.Variable(objectKey, nonolib.RequestEnvelopeType),
 		cel.Variable(variablesKey, authzcel.VariablesType),
 		cel.CustomTypeProvider(provider),
 	)
