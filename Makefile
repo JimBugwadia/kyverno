@@ -157,6 +157,7 @@ CLEANUP_DIR    := $(CMD_DIR)/cleanup-controller
 REPORTS_DIR    := $(CMD_DIR)/reports-controller
 BACKGROUND_DIR := $(CMD_DIR)/background-controller
 READINESS_DIR  := $(CMD_DIR)/readiness-checker
+NONO_DIR       := $(CMD_DIR)/kyverno-nono
 KYVERNO_BIN    := $(KYVERNO_DIR)/kyverno
 KYVERNOPRE_BIN := $(KYVERNOPRE_DIR)/kyvernopre
 CLI_BIN        := $(CLI_DIR)/kubectl-kyverno
@@ -164,6 +165,7 @@ CLEANUP_BIN    := $(CLEANUP_DIR)/cleanup-controller
 REPORTS_BIN    := $(REPORTS_DIR)/reports-controller
 BACKGROUND_BIN := $(BACKGROUND_DIR)/background-controller
 READINESS_BIN  := $(READINESS_DIR)/readiness-checker
+NONO_BIN       := $(NONO_DIR)/kyverno-nono
 PACKAGE        ?= github.com/kyverno/kyverno
 CGO_ENABLED    ?= 0
 ifdef VERSION
@@ -224,6 +226,10 @@ $(CLEANUP_BIN): fmt
 	@echo Build cleanup controller binary... >&2
 	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) go build -o ./$(CLEANUP_BIN) -ldflags=$(LD_FLAGS) ./$(CLEANUP_DIR)
 
+$(NONO_BIN): fmt
+	@echo Build kyverno-nono binary... >&2
+	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) go build -o ./$(NONO_BIN) -ldflags=$(LD_FLAGS) ./$(NONO_DIR)
+
 $(CLI_BIN): fmt
 	@echo Build cli binary... >&2
 	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) go build -o ./$(CLI_BIN) -ldflags=$(LD_FLAGS) ./$(CLI_DIR)
@@ -271,6 +277,10 @@ build-reports-controller: $(REPORTS_BIN)
 .PHONY: build-readiness-checker
 build-readiness-checker: ## Build readiness-checker binary
 build-readiness-checker: $(READINESS_BIN)
+
+.PHONY: build-nono-server
+build-nono-server: ## Build kyverno-nono approval server binary
+build-nono-server: $(NONO_BIN)
 
 build-all: ## Build all binaries
 build-all: build-background-controller

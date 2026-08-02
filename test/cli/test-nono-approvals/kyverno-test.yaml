@@ -1,0 +1,12 @@
+name: nono-approvals
+policies:
+  - policy.yaml
+tests:
+  - name: allow-kubectl-get
+    policy: nono-shell-policy
+    payload: payloads/kubectl-get.json
+    result: pass
+  - name: deny-kubectl-delete-ns
+    policy: nono-shell-policy
+    payload: payloads/kubectl-delete-ns.json
+    result: fail

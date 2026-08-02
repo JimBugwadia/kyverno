@@ -1,0 +1,19 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: nono-shell-policy
+spec:
+  evaluation:
+    mode: Nono
+  failurePolicy: Fail
+  variables:
+    - name: cmd
+      expression: "object.command"
+  validations:
+    - expression: >
+        object.capability_type == "command" &&
+        object.command == "kubectl" &&
+        object.argv().exists(a, a == "get")
+        ? nono.Grant()
+        : nono.Deny("only kubectl get is allowed")
+      message: "command not permitted"
