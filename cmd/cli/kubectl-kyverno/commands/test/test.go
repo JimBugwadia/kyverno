@@ -35,6 +35,7 @@ import (
 	"github.com/kyverno/kyverno/pkg/autogen"
 	"github.com/kyverno/kyverno/pkg/background/generate"
 	celengine "github.com/kyverno/kyverno/pkg/cel/engine"
+	nonotypes "github.com/kyverno/kyverno/pkg/cel/libs/authz/nono"
 	"github.com/kyverno/kyverno/pkg/cel/matching"
 	dpolcompiler "github.com/kyverno/kyverno/pkg/cel/policies/dpol/compiler"
 	dpolengine "github.com/kyverno/kyverno/pkg/cel/policies/dpol/engine"
@@ -204,6 +205,19 @@ func runTest(out io.Writer, testCase test.TestCase, registryAccess bool) (*TestR
 				return nil, fmt.Errorf("error: failed to load Envoy payloads from path %s (%s)", p, err)
 			}
 			envoyPayloads[p] = reqs
+		}
+	}
+
+	nonoPayloads := make(map[string]*nonotypes.CheckRequest, 0)
+	if len(testCase.Test.NonoPayloads) > 0 {
+		fmt.Fprintln(out, "  Loading nono payloads", "...")
+		nonoFullPaths := path.GetFullPaths(testCase.Test.NonoPayloads, testDir, isGit)
+		for _, p := range nonoFullPaths {
+			reqs, err := processor.LoadNonoRequests(p)
+			if err != nil {
+				return nil, fmt.Errorf("error: failed to load nono payloads from path %s (%s)", p, err)
+			}
+			nonoPayloads[p] = reqs
 		}
 	}
 
@@ -650,7 +664,7 @@ func runTest(out io.Writer, testCase test.TestCase, registryAccess bool) (*TestR
 		engineResponses = append(engineResponses, ers...)
 	}
 
-	authProzessor := processor.NewAuthzProcessor(&resultCounts, dClient, results.HTTPPolicies, results.EnvoyPolicies)
+	authProzessor := processor.NewAuthzProcessor(&resultCounts, dClient, results.HTTPPolicies, results.EnvoyPolicies, results.NonoPolicies)
 	if len(httpPayloads) > 0 {
 		for file, payload := range httpPayloads {
 			ers, err := authProzessor.ApplyHTTPPolicies([]*authzhttp.CheckRequest{payload})
@@ -666,6 +680,16 @@ func runTest(out io.Writer, testCase test.TestCase, registryAccess bool) (*TestR
 			ers, err := authProzessor.ApplyEnvoyPolicies([]*authv3.CheckRequest{payload})
 			if err != nil {
 				return nil, fmt.Errorf("failed to apply policies on Envoy payload (%w)", err)
+			}
+			testResponse.Trigger[file] = append(testResponse.Trigger[file], ers...)
+			engineResponses = append(engineResponses, ers...)
+		}
+	}
+	if len(nonoPayloads) > 0 {
+		for file, payload := range nonoPayloads {
+			ers, err := authProzessor.ApplyNonoPolicies([]*nonotypes.CheckRequest{payload})
+			if err != nil {
+				return nil, fmt.Errorf("failed to apply policies on nono payload (%w)", err)
 			}
 			testResponse.Trigger[file] = append(testResponse.Trigger[file], ers...)
 			engineResponses = append(engineResponses, ers...)

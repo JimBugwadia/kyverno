@@ -75,6 +75,7 @@ type PolicyProcessor struct {
 	ValidatingPolicies                []policiesv1beta1.ValidatingPolicyLike
 	EnvoyPolicies                     []*policiesv1beta1.ValidatingPolicy
 	HTTPPolicies                      []*policiesv1beta1.ValidatingPolicy
+	NonoPolicies                      []*policiesv1beta1.ValidatingPolicy
 	GeneratingPolicies                []policiesv1beta1.GeneratingPolicyLike
 	MutatingPolicies                  []policiesv1beta1.MutatingPolicyLike
 	TargetResources                   []*unstructured.Unstructured

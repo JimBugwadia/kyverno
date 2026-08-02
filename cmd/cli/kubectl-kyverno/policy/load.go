@@ -99,6 +99,7 @@ type LoaderResults struct {
 	ValidatingPolicies      []policiesv1beta1.ValidatingPolicyLike
 	EnvoyPolicies           []*policiesv1beta1.ValidatingPolicy
 	HTTPPolicies            []*policiesv1beta1.ValidatingPolicy
+	NonoPolicies            []*policiesv1beta1.ValidatingPolicy
 	ImageValidatingPolicies []policiesv1beta1.ImageValidatingPolicyLike
 	GeneratingPolicies      []policiesv1beta1.GeneratingPolicyLike
 	DeletingPolicies        []policiesv1beta1.DeletingPolicyLike
@@ -118,6 +119,7 @@ func (l *LoaderResults) merge(results *LoaderResults) {
 	l.ValidatingPolicies = append(l.ValidatingPolicies, results.ValidatingPolicies...)
 	l.EnvoyPolicies = append(l.EnvoyPolicies, results.EnvoyPolicies...)
 	l.HTTPPolicies = append(l.HTTPPolicies, results.HTTPPolicies...)
+	l.NonoPolicies = append(l.NonoPolicies, results.NonoPolicies...)
 	l.MAPs = append(l.MAPs, results.MAPs...)
 	l.MAPBindings = append(l.MAPBindings, results.MAPBindings...)
 	l.ImageValidatingPolicies = append(l.ImageValidatingPolicies, results.ImageValidatingPolicies...)
@@ -313,6 +315,8 @@ func processDocumentItem(gvk schema.GroupVersionKind, untyped *unstructured.Unst
 			results.EnvoyPolicies = append(results.EnvoyPolicies, typed)
 		case "HTTP":
 			results.HTTPPolicies = append(results.HTTPPolicies, typed)
+		case "Nono":
+			results.NonoPolicies = append(results.NonoPolicies, typed)
 		default:
 			results.ValidatingPolicies = append(results.ValidatingPolicies, typed)
 		}

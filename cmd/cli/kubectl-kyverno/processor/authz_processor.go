@@ -13,8 +13,10 @@ import (
 	authzhttp "github.com/kyverno/kyverno-authz/pkg/cel/libs/authz/http"
 	authzengine "github.com/kyverno/kyverno-authz/pkg/engine"
 	authzcompiler "github.com/kyverno/kyverno-authz/pkg/engine/compiler"
+	nonotypes "github.com/kyverno/kyverno/pkg/cel/libs/authz/nono"
 	"github.com/kyverno/kyverno/pkg/clients/dclient"
 	engineapi "github.com/kyverno/kyverno/pkg/engine/api"
+	nononcompiler "github.com/kyverno/kyverno/pkg/nono/compiler"
 	"github.com/kyverno/sdk/core"
 	"github.com/kyverno/sdk/core/dispatchers"
 	"github.com/kyverno/sdk/core/handlers"
@@ -30,6 +32,7 @@ type AuthzProcessor struct {
 	dclient       dclient.Interface
 	httpPolicies  []*policiesv1beta1.ValidatingPolicy
 	envoyPolicies []*policiesv1beta1.ValidatingPolicy
+	nonoPolicies  []*policiesv1beta1.ValidatingPolicy
 }
 
 func (p *AuthzProcessor) ApplyHTTPPolicies(resources []*authzhttp.CheckRequest) ([]engineapi.EngineResponse, error) {
@@ -37,6 +40,21 @@ func (p *AuthzProcessor) ApplyHTTPPolicies(resources []*authzhttp.CheckRequest) 
 	for _, req := range resources {
 		for _, vpol := range p.httpPolicies {
 			resp, err := processHTTPPolicy(vpol, req, p.dclient)
+			if err != nil {
+				return nil, err
+			}
+			p.rc.AddValidatingPolicyResponse(resp)
+			responses = append(responses, resp)
+		}
+	}
+	return responses, nil
+}
+
+func (p *AuthzProcessor) ApplyNonoPolicies(resources []*nonotypes.CheckRequest) ([]engineapi.EngineResponse, error) {
+	responses := make([]engineapi.EngineResponse, 0)
+	for _, req := range resources {
+		for _, vpol := range p.nonoPolicies {
+			resp, err := processNonoPolicy(vpol, req, p.dclient)
 			if err != nil {
 				return nil, err
 			}
@@ -67,12 +85,14 @@ func NewAuthzProcessor(
 	dclient dclient.Interface,
 	httpPolicies []*policiesv1beta1.ValidatingPolicy,
 	envoyPolicies []*policiesv1beta1.ValidatingPolicy,
+	nonoPolicies []*policiesv1beta1.ValidatingPolicy,
 ) *AuthzProcessor {
 	return &AuthzProcessor{
 		rc:            rc,
 		dclient:       dclient,
 		httpPolicies:  httpPolicies,
 		envoyPolicies: envoyPolicies,
+		nonoPolicies:  nonoPolicies,
 	}
 }
 
@@ -230,4 +250,82 @@ func LoadHTTPRequests(path string) (*authzhttp.CheckRequest, error) {
 		return nil, err
 	}
 	return &p, nil
+}
+
+func LoadNonoRequests(path string) (*nonotypes.CheckRequest, error) {
+	content, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read nono payload file %s: %w", path, err)
+	}
+	req, err := nonotypes.ParseRequest(content)
+	if err != nil {
+		return nil, err
+	}
+	return &req, nil
+}
+
+func processNonoPolicy(vpol *policiesv1beta1.ValidatingPolicy, request *nonotypes.CheckRequest, dClient dclient.Interface) (engineapi.EngineResponse, error) {
+	var dynClient dynamic.Interface
+	if dClient != nil {
+		dynClient = dClient.GetDynamicInterface()
+	}
+	compiler := nononcompiler.NewCompiler(dynClient)
+	compiled, errs := compiler.Compile(&policiesv1.ValidatingPolicy{TypeMeta: vpol.TypeMeta, ObjectMeta: vpol.ObjectMeta, Spec: vpol.Spec}, nil)
+	if len(errs) > 0 {
+		return engineapi.EngineResponse{}, fmt.Errorf("failed to compile nono policy %s: %v", vpol.Name, errs.ToAggregate())
+	}
+
+	type NonoPolicy = nononcompiler.CompiledPolicy
+	eng := core.NewEngine(
+		core.MakeSource(compiled),
+		handlers.Handler(
+			dispatchers.Sequential(
+				sdkpolicy.EvaluatorFactory[NonoPolicy](),
+				func(ctx context.Context, fc core.FactoryContext[NonoPolicy, dynamic.Interface, *nonotypes.CheckRequest]) core.Breaker[NonoPolicy, *nonotypes.CheckRequest, sdkpolicy.Evaluation[*nonotypes.CheckResponse]] {
+					return core.MakeBreakerFunc(func(_ context.Context, _ NonoPolicy, _ *nonotypes.CheckRequest, out sdkpolicy.Evaluation[*nonotypes.CheckResponse]) bool {
+						return out.Result != nil
+					})
+				},
+			),
+			func(ctx context.Context, fc core.FactoryContext[NonoPolicy, dynamic.Interface, *nonotypes.CheckRequest]) core.Resulter[NonoPolicy, *nonotypes.CheckRequest, sdkpolicy.Evaluation[*nonotypes.CheckResponse], sdkpolicy.Evaluation[*nonotypes.CheckResponse]] {
+				return resulters.NewFirst[NonoPolicy, *nonotypes.CheckRequest](func(out sdkpolicy.Evaluation[*nonotypes.CheckResponse]) bool {
+					return out.Result != nil || out.Error != nil
+				})
+			},
+		),
+	)
+
+	evaluation := eng.Handle(context.TODO(), dynClient, request)
+
+	var status engineapi.RuleStatus
+	var message string
+
+	if evaluation.Result == nil && evaluation.Error == nil {
+		status = engineapi.RuleStatusSkip
+		message = "request does not match"
+	} else if evaluation.Result != nil {
+		if evaluation.Result.Granted != nil {
+			status = engineapi.RuleStatusPass
+			message = "request granted"
+		} else if evaluation.Result.Denied != nil {
+			status = engineapi.RuleStatusFail
+			message = fmt.Sprintf("request denied, reason: %s", evaluation.Result.Denied.Reason)
+		}
+	} else if evaluation.Error != nil {
+		status = engineapi.RuleStatusError
+		message = evaluation.Error.Error()
+	}
+
+	resource := unstructured.Unstructured{Object: make(map[string]interface{})}
+	response := engineapi.EngineResponse{
+		Resource: resource,
+		PolicyResponse: engineapi.PolicyResponse{
+			Rules: []engineapi.RuleResponse{
+				*engineapi.NewRuleResponse(vpol.Name, engineapi.Validation, message, status, nil),
+			},
+		},
+	}
+	response = response.WithPolicy(engineapi.NewValidatingPolicy(vpol))
+
+	return response, nil
 }

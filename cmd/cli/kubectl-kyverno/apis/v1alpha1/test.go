@@ -44,6 +44,9 @@ type Test struct {
 	// EnvoyPayloads is the Envoy payloads to be used in the test
 	EnvoyPayloads []string `json:"envoyPayloads,omitempty"`
 
+	// NonoPayloads is the nono approval request payloads to be used in the test
+	NonoPayloads []string `json:"nonoPayloads,omitempty"`
+
 	// Target Resources are for policies that have mutate existing
 	TargetResources []string `json:"targetResources,omitempty"`
 
