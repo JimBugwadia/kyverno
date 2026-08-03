@@ -104,6 +104,33 @@ url         = "http://localhost:8765/approve"
 timeout_secs = 5        # nono denies automatically on timeout (fail-closed)
 ```
 
+### Require approvals for all intercepted requests
+
+If you want every intercepted command and endpoint request to go through Kyverno, configure nono with catch-all approval rules and keep kyverno-nono deny-by-default.
+
+```toml
+[approval_backend]
+url = "http://localhost:8765/approve"
+timeout_secs = 5
+
+# Catch-all rules so every intercepted request is approved by kyverno-nono.
+[[invocation_policy]]
+name = "all-commands"
+action = "approve"
+
+[[endpoint_policy]]
+name = "all-endpoints"
+action = "approve"
+```
+
+With that setup:
+
+- nono forwards every intercepted command/HTTP request to `kyverno-nono`
+- kyverno-nono only grants requests that match an explicit `nono.Grant()` policy
+- anything else is denied
+
+This covers all traffic nono intercepts, not arbitrary processes outside nono’s hooks.
+
 ---
 
 ## Policy reference
